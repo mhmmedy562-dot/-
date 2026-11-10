@@ -1,5 +1,5 @@
 
-name: Android Build APK
+name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -31,13 +31,42 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      - name: Find Android Project
+        shell: bash
+        run: |
+          SETTINGS_FILE=$(find . \
+            -name settings.gradle.kts \
+            -not -path '*/.gradle/*' \
+            -print -quit)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            SETTINGS_FILE=$(find . \
+              -name settings.gradle \
+              -not -path '*/.gradle/*' \
+              -print -quit)
+          fi
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: Gradle project not found!"
+            find . -maxdepth 3 -type f | head -100
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Android project found: $PROJECT_DIR"
+
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+        run: |
+          gradle -p "$PROJECT_DIR" assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PS-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: |
+            **/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
