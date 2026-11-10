@@ -37,38 +37,46 @@ jobs:
           ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' -print -quit)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP file not found!"
+            echo "ZIP file not found!"
             exit 1
           fi
 
           mkdir -p _android_source
           unzip -q "$ZIP_FILE" -d _android_source
 
-          echo "ZIP extracted successfully!"
-
       - name: Find Gradle Project
         shell: bash
         run: |
           SETTINGS_FILE=$(find _android_source \
-            -name settings.gradle.kts \
-            -print -quit)
+            -name settings.gradle.kts -print -quit)
 
           if [ -z "$SETTINGS_FILE" ]; then
             SETTINGS_FILE=$(find _android_source \
-              -name settings.gradle \
-              -print -quit)
+              -name settings.gradle -print -quit)
           fi
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: settings.gradle not found!"
+            echo "Gradle project not found!"
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
           echo "Project found: $PROJECT_DIR"
+
+      - name: Generate Debug Keystore
+        shell: bash
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$PROJECT_DIR/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build Debug APK
         run: |
@@ -78,6 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AMMAR-APK
-          path: _android_source/**/app/build/outputs/apk/debug/*.apk
+          path: |
+            _android_source/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
